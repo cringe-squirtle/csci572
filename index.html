@@ -1,0 +1,128 @@
+<html>
+
+<head>
+    <title>stupid homework</title>
+</head>
+
+<body>
+    <label>search:
+        <div>
+        <input id='searchBox' />
+        <div id='searchSuggestionBox'></div>
+    </div>
+    </label>
+    
+
+    <br />
+    <select id="searchTypeSelect">
+        <option value="0">lucene</option>
+        <option value="1">page rank</option>
+    </select>
+    <button id='submitButton'>submit</button>
+    <br />
+    <hr />
+    <h1 id='titleBox' style='text-align: center;width:80%;'></h1>
+
+    <div id='spellcheckBox'></div>
+    <br/>
+    <div id='renderBox'></div>
+
+    <div style='display: flex;justify-content: space-around;'>
+        <div style="width:40%" id='renderBoxLeft'></div>
+        <div style="width:40%" id='renderBoxRight'></div>
+    </div>
+</body>
+<script>
+
+
+
+    const searchBox = document.querySelector('#searchBox');
+    const searchSuggestionBox = document.querySelector('#searchSuggestionBox');
+    const searchTypeSelect = document.querySelector('#searchTypeSelect');
+    const renderBox = document.querySelector('#renderBox');
+    const renderBoxLeft = document.querySelector('#renderBoxLeft');
+    const renderBoxRight = document.querySelector('#renderBoxRight');
+    const submitButton = document.querySelector('#submitButton');
+    const titleBox = document.querySelector('#titleBox');
+    const spellcheckBox = document.querySelector('#spellcheckBox');
+
+    const RANK_QUERY_TYPES = ['', 'pageRankFile asc'];
+
+    
+
+    function removeAllChildNodes(parent) {
+        while (parent.firstChild) {
+            parent.removeChild(parent.firstChild);
+        }
+    }
+
+    submitButton.onclick = () => {
+
+        const rankerQuery = RANK_QUERY_TYPES[searchTypeSelect.value];
+        formatFetch2HTML(getURIwithParam('search', searchBox.value, rankerQuery), renderBox, '');
+        // formatFetch2HTML(`/api/${searchBox.value}/pageRankFile asc`, renderBoxLeft, 'page ranker');
+        // formatFetch2HTML(`/api/${searchBox.value}/`, renderBoxRight, 'lucene');
+    }
+    searchBox.oninput = e=>{
+        const rankerQuery = RANK_QUERY_TYPES[searchTypeSelect.value];
+        const url = getURIwithParam('suggest', e.target.value, rankerQuery)
+        fetch(url).then(response=>response.json()).then(res=>renderSuggestions(res));
+    }
+
+    const renderSuggestions = ({suggestion=[]}) =>{
+        removeAllChildNodes(searchSuggestionBox)
+        suggestion.forEach(name=>{
+            const div = document.createElement('div');
+            div.innerHTML = `<a href='?q=${name}&t=${searchTypeSelect.value}'>${name}</a>`;
+            searchSuggestionBox.appendChild(div)
+        })
+    }
+
+    const getURIwithParam = (type, q, rankerQuery) => `/api/${type}?q=${q}&r=${rankerQuery}`
+
+    const formatFetch2HTML = ((url, root, name) => {
+
+        root.innerHTML = name;
+        fetch(url).then(response => response.json()).then(res => {
+            const { docs, spellcheck } = res;
+            renderDocList(docs, root);
+            renderSpellCheck(spellcheck, root);
+        })
+    });
+
+    const renderSpellCheck = (spellcheck = []) => {
+        if(spellcheck.length<1) return;
+        removeAllChildNodes(spellcheckBox);
+        const [searchWord, suggests] = spellcheck
+        spellcheckBox.innerHTML = `<div>not much results for ${searchWord}</div></br><div>do you mean?</div></br>`
+        const rankerQuery = RANK_QUERY_TYPES[searchTypeSelect.value];
+        (suggests?.suggestion ?? []).forEach(({ word = null }) => {
+            if (word == null) return;
+            const div = document.createElement('div');
+            div.innerHTML = `<a href='?q=${word}&t=${searchTypeSelect.value}'>${word}</a>`;
+            spellcheckBox.appendChild(div);
+        })
+
+    }
+
+    const renderDocList = (docs, root) => {
+        removeAllChildNodes(root);
+        docs.forEach(({ title = null, url = null, description = null }) => {
+            if(url==null || description==null || title == null) return;
+            const div = document.createElement('div');
+            div.style.minHeight = 40;
+            div.innerHTML = `<a href=${url} style='font-size:24px'>${title}</a> <div>${description}</div>`;
+            const hr = document.createElement('hr');
+            root.appendChild(div);
+            root.appendChild(hr);
+        })
+    }
+
+    const params = (new URL(document.location)).searchParams;
+    searchBox.value = params.get('q') ?? '';
+    searchTypeSelect.value = parseInt(params.get('t')??0);
+    formatFetch2HTML(getURIwithParam('search', searchBox.value, RANK_QUERY_TYPES[searchTypeSelect.value]), renderBox, '');
+
+</script>
+
+</html>
